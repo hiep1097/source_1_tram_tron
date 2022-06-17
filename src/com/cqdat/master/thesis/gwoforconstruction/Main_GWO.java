@@ -14,7 +14,7 @@ public class Main_GWO {
         f_GWO_RMC_CWT ff_cwt = new f_GWO_RMC_CWT();
         f_GWO_RMC_CWT ff_twc = new f_GWO_RMC_TWC();
 
-        int maxiter = 100;
+        int maxiter = 10;
         int N = 30;
 
         GWO qbpso_cwt = new GWO(ff_cwt, ff_cwt.Lower, ff_cwt.Upper, maxiter, N);
@@ -143,21 +143,13 @@ public class Main_GWO {
         System.out.println((totalTime / 1000.0) + " sec");
 
         System.out.println("=============== RESULT ===============");
+        System.out.println("Result have " + lstParetoData.size() + " values");
 
         for(int i = 0; i < lst_fSimRMC.size(); i++) {
             System.out.println("--> No. " + (i + 1) + " <--" );
             lst_fSimRMC.get(i).PrintRMC();
             lst_fSimRMC.get(i).PrintPlanOfTruck();
         }
-
-        System.out.println("Result have " + lstParetoData.size() + " values");
-        System.out.println("----->> Best of CWT <<-----");
-        System.out.println("CWT = " + _fSimRMC_CWT.CWT + " - TWC = " + _fSimRMC_CWT.TWC);
-        qbpso_cwt.toStringNew("Optimized value CWT = ");
-
-        System.out.println("----->> Best of TWC <<-----");
-        System.out.println("CWT = " + _fSimRMC_TWC.CWT + " - TWC = " + _fSimRMC_TWC.TWC);
-        qbpso_twc.toStringNew("Optimized value TWC = ");
 
         ParetoChart chart = new ParetoChart();
         ParetoChart.lstData = lstData;

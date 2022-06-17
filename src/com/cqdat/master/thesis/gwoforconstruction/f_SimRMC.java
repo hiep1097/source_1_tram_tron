@@ -7,15 +7,12 @@ import java.util.Scanner;
 
 public class f_SimRMC {
 
-    public ArrayList<Site> lstSite = new ArrayList<Site>();             // Danh sách Công trường
-    public ArrayList<ConstructionType> lstCT = new ArrayList<ConstructionType>();   // Danh sách loại công trường (Dầm, sàn, cột)
-    public ArrayList<RMCTruckSchedule> lstRMCTruckSchedule = new ArrayList<RMCTruckSchedule>();    // Thông tin chi tiết 1 lần đổ bên tông của một xe
-    public ArrayList<ScheduleTruck> lstScheduleTrucks = new ArrayList<ScheduleTruck>();         // Thông tin lịch đổ bê tông của một xe
-    public ArrayList<RMCStation> lstRMCStation = new ArrayList<RMCStation>();                // Danh sách các trạm trộn
-
-    public int[] arrTruckTBB = new int[1000];                      // Danh TBB của từng xe tại
-    public int[] arrLT = new int[1000];                            // Thời điểm xe rời công trường
-    public int numOfTruck = 0;                                     // Tổng tất cả các Truck đang
+    public ArrayList<Site> lstSite = new ArrayList<>();                                         // Danh sách Công trường
+    public ArrayList<ConstructionType> lstCT = new ArrayList<>();                               // Danh sách loại cấu kiện (Dầm, sàn, cột)
+    public ArrayList<RMCTruckSchedule> lstRMCTruckSchedule = new ArrayList<>();                 // Thông tin chi tiết 1 lần đổ bên tông của một xe
+    public ArrayList<ScheduleTruck> lstScheduleTrucks = new ArrayList<ScheduleTruck>();         // Thông tin lịch đổ bê tông của các xe tải
+    public RMCStation rmcStation;                                   // 1 trạm trộn
+    public boolean[] arrUsedTruckTBBMin = new boolean[1000];       // Mảng đánh dấu đã sử dụng TBB làm min
 
     public int powerOfTruck = 0; // Khả năng của xe có thể chở được tối đa bao nhiêu m3 bê tông
     public float vOfGo = 0;      // Vận tốc xe từ trạm trộn đến công trường
@@ -29,10 +26,11 @@ public class f_SimRMC {
     public int N = 0;        // Tổng số xe cần bàn cho tất cả các công trường
     public int m = 0;        // Tổng số công trường
 
-    public ArrayList<FDT> lstFDT = new ArrayList<>();      //Thời gian khởi hành sớm nhất
+    int infinity = 1000000000;
 
     public f_SimRMC(){
         try {
+            rmcStation = new RMCStation();
             ReadFile("Data/input_1_tram.data");
         } catch (IOException e) {
             e.printStackTrace();
@@ -151,8 +149,6 @@ public class f_SimRMC {
                 for(int i = 0; i < numberOfStation; i++){
                     readLineFromFile(scan); //Đọc bỏ dòng -----
 
-                    RMCStation rmcStation = new RMCStation();
-
                     String line = readLineFromFile(scan);
                     String data[] = line.split("\\:");
                     rmcStation.StationID = data[1];
@@ -168,14 +164,10 @@ public class f_SimRMC {
                     for(int j = 0; j < arrD.length; j++){
                         rmcStation.lstD.add(Integer.parseInt(arrD[i]));
                     }
-
-                    lstRMCStation.add(rmcStation);
                 }
             }
 
-            for(RMCStation r : lstRMCStation){
-                r.calTimeGoBack(vOfGo, vOfBack);
-            }
+            rmcStation.calTimeGoBack(vOfGo, vOfBack);
 
             for(Site s : lstSite) {
                 s.calNumOfTruck(powerOfTruck);
@@ -193,36 +185,17 @@ public class f_SimRMC {
     }
 
     public void calFDT(){
-        int truckID = 1;
-        // Tính min thời gian khởi hành của mỗi trạm trộn tới công trường
-        for(RMCStation rmc : lstRMCStation){
-            int fdt = lstSite.get(0).calTimeTruckMove(rmc.lstTDG.get(0)) - (lstRMCTruckSchedule.get(0).delivery * rmc.timeMD);
+        // Tính min thời gian khởi hành của trạm trộn tới công trường
+        int fdt = lstSite.get(0).calTimeTruckMove(rmcStation.lstTDG.get(0));
 
-            for(int i = 0; i < lstSite.size(); i++){
-                if(fdt > lstSite.get(i).calTimeTruckMove(rmc.lstTDG.get(i)) - (lstRMCTruckSchedule.get(0).delivery * rmc.timeMD)){
-                    fdt = lstSite.get(i).calTimeTruckMove(rmc.lstTDG.get(i) - (lstRMCTruckSchedule.get(0).delivery * rmc.timeMD));
-                }
+        for(int i = 1; i < lstSite.size(); i++){
+            if(fdt > lstSite.get(i).calTimeTruckMove(rmcStation.lstTDG.get(i))){
+                fdt = lstSite.get(i).calTimeTruckMove(rmcStation.lstTDG.get(i));
             }
-
-            FDT objFDT = new FDT();
-            objFDT.rmcstationID = rmc.StationID;
-            objFDT.fdtValue = fdt;
-
-            rmc.timeFirstTruckGo = fdt;
-            rmc.initListOfIDT(truckID, powerOfTruck);
-            truckID += rmc.c;
-
-            lstFDT.add(objFDT);
         }
-    }
 
-    public void initListTruckTBB(){
-        numOfTruck = 0;
-        for(RMCStation r : lstRMCStation)
-            numOfTruck += r.c;
-
-        for(int i = 0; i < numOfTruck; i++)
-            arrTruckTBB[i] = 0;
+        rmcStation.timeFirstTruckGo = fdt;
+        rmcStation.initListOfIDT(N);
     }
 
     public void initRMC(){
@@ -272,168 +245,90 @@ public class f_SimRMC {
             rmc.s = lstSite.get(rm.siteID - 1);
             rmc.k = rm.k;
             rmc.calDelivery(powerOfTruck);
-
+            rmc.TBB = infinity;
             lstRMCTruckSchedule.add(rmc);
         }
-
     }
 
     public void initScheduleTruck(){
         int truckID = 0;
-
-        for(RMCStation r : lstRMCStation) {
-            //c += r.c;
-
-            for (int i = 0; i < r.c; i++) {
-                ScheduleTruck schTruck = new ScheduleTruck();
-                schTruck.truckID = truckID++ + 1;
-                int deltaTimeOutputOfTruck = (i < lstRMCTruckSchedule.size()) ? ((i == 0) ? 0 : RMCStation.MD) : 0;
-                schTruck.outputTime = r.timeFirstTruckGo + (i * deltaTimeOutputOfTruck);
-                schTruck.stationID = r.StationID;
-                lstScheduleTrucks.add(schTruck);
-            }
+        for (int i = 0; i < rmcStation.c; i++) {
+            ScheduleTruck scheduleTruck = new ScheduleTruck();
+            scheduleTruck.truckID = truckID++ + 1;
+            lstScheduleTrucks.add(scheduleTruck);
         }
-    }
-
-    public void swapScheduleTruck(ScheduleTruck a, ScheduleTruck b) {
-        int tempTruckID = a.truckID;
-        int tempInputTime = a.inputTime;
-        int tempOutputTime = a.outputTime;
-        String tempStationID = a.stationID;
-
-        a.truckID = b.truckID;
-        a.inputTime = b.inputTime;
-        a.outputTime = b.outputTime;
-        a.stationID = b.stationID;
-
-        b.truckID = tempTruckID;
-        b.inputTime = tempInputTime;
-        b.outputTime = tempOutputTime;
-        b.stationID = tempStationID;
-    }
-
-    public void calScheduleTruck(int startRMCID, int c, int timeMD){
-        for(int i = 0; i < c - 1; i++){
-            for(int j = i + 1; j < c; j++){
-                if(lstScheduleTrucks.get(i).inputTime > lstScheduleTrucks.get(j).inputTime){
-                    swapScheduleTruck(lstScheduleTrucks.get(i), lstScheduleTrucks.get(j));
-                }
-            }
-        }
-
-        int IDT = lstScheduleTrucks.get(0).inputTime + (lstRMCTruckSchedule.get(startRMCID + 1).delivery * timeMD);
-
-        for(int i = 0; i < c; i++){
-
-            int deltaTimeOutputOfTruck = ((i == 0 || (startRMCID + i) >= lstRMCTruckSchedule.size()) ? 0 : (lstRMCTruckSchedule.get(startRMCID + i).delivery * timeMD));
-            lstScheduleTrucks.get(i).outputTime = IDT + (i * deltaTimeOutputOfTruck);
-        }
-    }
-
-    public void initArrayLT(){
-        for(int i = 0; i < lstSite.size(); i++){
-            arrLT[i] = 0;
-        }
-
-    }
-
-    public RMCStation findRMCStation(String stationID){
-        for(RMCStation station : lstRMCStation)
-            if(station.StationID.equals(stationID))
-                return station;
-        return null;
-    }
-
-    private ScheduleTruck CalTruckFromStation(Site s) {
-        ScheduleTruck scheduleTruck = new ScheduleTruck();
-
-        RMCStation goodStation = lstRMCStation.get(0);
-
-        for(int i = 1; i < lstRMCStation.size(); i++){
-            if(goodStation.lstIDT.size() == 0 || goodStation.calTimeComedToSite(s.siteID) > lstRMCStation.get(i).calTimeComedToSite(s.siteID))
-                goodStation = lstRMCStation.get(i);
-        }
-
-        scheduleTruck.truckID = goodStation.lstIDT.get(0).truckID;
-        scheduleTruck.inputTime = goodStation.lstIDT.get(0).inputTime;
-        scheduleTruck.outputTime = goodStation.lstIDT.get(0).outputTime;
-        scheduleTruck.stationID = goodStation.StationID;
-
-        goodStation.lstIDT.remove(0);
-
-        return scheduleTruck;
-    }
-
-    private ScheduleTruck CalTruckComeBackStation(Site s, int LT){
-        ScheduleTruck scheduleTruck = new ScheduleTruck();
-
-        RMCStation goodStation = lstRMCStation.get(0);
-
-        for(int i = 1; i < lstRMCStation.size(); i++){
-            if(goodStation.lstIDT.size() == 0 || goodStation.calTimeOut(s.siteID, LT, powerOfTruck) > lstRMCStation.get(i).calTimeOut(s.siteID, LT, powerOfTruck))
-                goodStation = lstRMCStation.get(i);
-        }
-
-        //scheduleTruck.truckID = goodStation.lstIDT.get(0).truckID;
-        scheduleTruck.inputTime = (goodStation.lstIDT.size() == 0) ? LT : goodStation.lstIDT.get(0).inputTime;
-        scheduleTruck.outputTime = goodStation.calTimeOut(s.siteID, LT, powerOfTruck);
-        scheduleTruck.stationID = goodStation.StationID;
-
-        return scheduleTruck;
     }
 
 
     public void ExecuteAlgorithm(){
 
+        for(int i = 0; i < N; i++){
+            arrUsedTruckTBBMin[i] = false;
+        }
+
+        initScheduleTruck();
+
         //Khởi tạo quần thể RMCTruckSchedule
         initRMC();
 
-        initListTruckTBB();
-
-        //Tính FDT
+        //Tính FDT, IDT
         calFDT();
 
-        //Khởi tạo quần thể ScheduleTruck
-        initScheduleTruck();
-        initArrayLT();
+        //tinh toan cac gia tri
+        for(int i=0; i< N; i++){
+            RMCTruckSchedule rmcTruckSchedule = lstRMCTruckSchedule.get(i);
+            if (i < rmcStation.c){
+                rmcTruckSchedule.SDT = rmcStation.lstIDT.get(i).outputTime;
+                rmcTruckSchedule.truckID = rmcStation.lstIDT.get(i).truckID;
+            } else {
+                int minTBB = infinity;
+                int position_minTBB = -1;
+                for (int l=0; l<i; l++){
+                    if (!arrUsedTruckTBBMin[l] && minTBB > lstRMCTruckSchedule.get(l).TBB){
+                        minTBB = lstRMCTruckSchedule.get(l).TBB;
+                        position_minTBB = l;
+                    }
+                }
+                arrUsedTruckTBBMin[position_minTBB] = true;
+                rmcTruckSchedule.SDT = minTBB + RMCStation.MD;
+                rmcTruckSchedule.truckID = lstRMCTruckSchedule.get(position_minTBB).truckID;
+            }
 
-        //Cập nhật Giá trị SDT của Block Schedule đầu tiên
-        for(RMCTruckSchedule rts : lstRMCTruckSchedule){
-            ScheduleTruck scheduleTruck = CalTruckFromStation(rts.s);
+            rmcTruckSchedule.CD_RMC = rmcTruckSchedule.delivery * rmcTruckSchedule.s.CD;
 
-            RMCStation station = findRMCStation(scheduleTruck.stationID);
-            rts.StationID_Go = station.StationID;
-            rts.truckID = scheduleTruck.truckID;
-            rts.calMD_and_CD_RMC();
+            rmcTruckSchedule.TDG = rmcStation.lstTDG.get(rmcTruckSchedule.s.siteID-1);
+            rmcTruckSchedule.TDB = rmcStation.lstTDB.get(rmcTruckSchedule.s.siteID-1);
 
-            int ltOfSite  = arrLT[rts.s.siteID - 1];
-            int TDG = station.lstTDG.get(rts.s.siteID - 1);
+            rmcTruckSchedule.TAC = rmcTruckSchedule.SDT + rmcTruckSchedule.TDG;
 
-            ScheduleTruck scheduleTruck_2 = CalTruckComeBackStation(rts.s, rts.LT);
-            scheduleTruck_2.truckID = scheduleTruck.truckID;
+            //Tính PTF
+            if(rmcTruckSchedule.k == 1) {
+                rmcTruckSchedule.PTF = rmcTruckSchedule.s.SCT;
+            } else {
+                //find LT of (k-1)th truck leaves site j
+                int siteID = rmcTruckSchedule.s.siteID;
+                int position = -1;
+                for (int l=0; l<i; l++){
+                    if (lstRMCTruckSchedule.get(l).s.siteID == siteID && lstRMCTruckSchedule.get(l).k == rmcTruckSchedule.k-1){
+                        position = l;
+                    }
+                }
+                rmcTruckSchedule.PTF = lstRMCTruckSchedule.get(position).LT;
+            }
 
-            RMCStation stationBack = findRMCStation(scheduleTruck_2.stationID);
-            int TDB = stationBack.lstTDB.get(rts.s.siteID - 1);
+            rmcTruckSchedule.WC = rmcTruckSchedule.PTF - rmcTruckSchedule.TAC;
 
-            rts.StationID_Back = stationBack.StationID;
-            rts.TBB = rts.LT + stationBack.lstTimeBack.get(rts.s.siteID - 1);
+            if(rmcTruckSchedule.WC >= 0){
+                rmcTruckSchedule.LT = rmcTruckSchedule.TAC + rmcTruckSchedule.WC + rmcTruckSchedule.CD_RMC;
+            } else {
+                rmcTruckSchedule.LT = rmcTruckSchedule.TAC + rmcTruckSchedule.CD_RMC;
+            }
 
-            stationBack.lstIDT.add(scheduleTruck_2);
-
-            int SDT = scheduleTruck.outputTime;
-            int truckTBB = arrTruckTBB[scheduleTruck.truckID - 1];
-            if(truckTBB != 0 && (truckTBB + RMCStation.MD) > SDT)
-                SDT = truckTBB + RMCStation.MD;
-
-            rts.calSDT(SDT, ltOfSite, TDG, TDB);
-
-            arrLT[rts.s.siteID - 1] = rts.LT;
-            arrTruckTBB[scheduleTruck.truckID - 1] = rts.TBB;
+            rmcTruckSchedule.TBB = rmcTruckSchedule.LT + rmcTruckSchedule.TDB;
+            lstRMCTruckSchedule.set(i, rmcTruckSchedule);
         }
 
         calcSum_TWC_CWT();
-
-//        PrintRMC();
     }
 
     public void PrintRMC(){
@@ -444,11 +339,23 @@ public class f_SimRMC {
         }
         System.out.println("=> TWC: " + TWC);
         System.out.println("=> CWT: " + CWT);
+
+        System.out.println("Chuoi phan phoi: ");
+        System.out.print("[");
+        for(int i=0; i<lstRMCTruckSchedule.size(); i++){
+            if (i!=lstRMCTruckSchedule.size()-1){
+                System.out.print(lstRMCTruckSchedule.get(i).s.siteID+",");
+            } else {
+                System.out.print(lstRMCTruckSchedule.get(i).s.siteID);
+            }
+        }
+        System.out.print("]");
+        System.out.println();
     }
 
     public void PrintPlanOfTruck(){
         System.out.println("------------------------------------------------------------------------------------------------------------------");
-        System.out.println("Arrive at plant\tGo to site \t Arrive at site \t Leave from site \t Return to plant \t Plant go \t Plant back");
+        System.out.println("Arrive at plant\tGo to site \t Arrive at site \t Leave from site \t Return to plant");
         System.out.println("------------------------------------------------------------------------------------------------------------------");
         for (ScheduleTruck scheduleTruck : lstScheduleTrucks){
             PlanOfTruck planOfTruck = new PlanOfTruck();
@@ -462,13 +369,10 @@ public class f_SimRMC {
                     p.ArriveAtSite = strMinuteToHour(rmcTruckSchedule.TAC);
                     p.LeaveFromSite = strMinuteToHour(rmcTruckSchedule.LT);
                     p.ReturnToPlant = strMinuteToHour(rmcTruckSchedule.TBB);
-                    p.GoStation = rmcTruckSchedule.StationID_Go;
-                    p.BackStation = rmcTruckSchedule.StationID_Back;
                     planOfTruck.lstPlan.add(p);
                 }
             }
-
-            System.out.println(planOfTruck.toString());
+            System.out.println(planOfTruck);
         }
     }
 

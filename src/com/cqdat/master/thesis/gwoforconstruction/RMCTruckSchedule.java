@@ -19,13 +19,6 @@ public class RMCTruckSchedule {
     public int TDG;     //Thời gian từ trạm trộn đến công trường
     public int TDB;     //Thời gian từ công trường về trạm trộn
 
-    public String StationID_Go;     // Mã trạm trộn đi
-    public String StationID_Back;   // Mã trạm trộn quay về
-
-    public void calMD_and_CD_RMC(){
-        CD_RMC = delivery * s.CD;
-    }
-
     public void calDelivery(int powerOfTruck){
         if(k < s.numOfTruck) {
             delivery = powerOfTruck;
@@ -38,33 +31,8 @@ public class RMCTruckSchedule {
         }
     }
 
-    public void calSDT(int value, int ltOfSite, int iTDG, int iTDB){
-        TDG = iTDG;
-        TDB = iTDB;
-        SDT = value;
-        TAC = SDT + TDG;
-
-        //Tính PTF
-        if(ltOfSite == 0) {
-            PTF = s.SCT;
-        } else {
-            PTF = ltOfSite;
-        }
-
-        WC = PTF - TAC;
-
-        if(WC >= 0){
-            LT = TAC + WC + CD_RMC;
-        } else {
-            LT = TAC + CD_RMC;
-        }
-
-        TBB = LT + TDB;
-
-    }
-
     @Override
     public String toString(){
-        return rmcID + "\t" + s.toString() + "\tTDG:" + TDG + "\tTDB:" + TDB + "\t" + k + "\t" + delivery + "\t" + /*XD*/ "\t" + CD_RMC + "\t|\tSDT:" + String.format("%04d", SDT) + "\tTAC:" + String.format("%04d", TAC) + "\tPTF:" + String.format("%04d", PTF) + "\tWC:" + String.format("%05d", WC) + "\tLT:" + LT + "\tTBB:" + String.format("%04d", TBB) + "\tTruckID:" + truckID + "\tFrom: " + StationID_Go + " -> To: " + StationID_Back;
+        return rmcID + "\t" + s.toString() + "\tTDG:" + TDG + "\tTDB:" + TDB + "\t" + k + "\t" + delivery + "\t" + CD_RMC + "\t|\tSDT:" + String.format("%04d", SDT) + "\tTAC:" + String.format("%04d", TAC) + "\tPTF:" + String.format("%04d", PTF) + "\tWC:" + String.format("%05d", WC) + "\tLT:" + LT + "\tTBB:" + String.format("%04d", TBB) + "\tTruckID:" + truckID;
     }
 }
